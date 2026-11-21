@@ -7,11 +7,43 @@ Funciona sobre el YouTube de verdad: tu cuenta, tus suscripciones y la interfaz 
 
 ---
 
+## La app (app/)
+
+**https://byalvaroo.github.io/ByAdBlock/app/** — misma interfaz que YTVOD, con todo YouTube:
+
+- **Buscar** vídeos y canales (pestañas Todo / Vídeos / Canales). También puedes pegar un enlace de YouTube.
+- **Canales**: cabecera, todos sus vídeos (con «Cargar más») y buscador dentro del canal.
+- **Ver vídeo**: reproductor, descripción con enlaces y minutos que se pueden pulsar, «Más del canal», compartir y abrir en YouTube. Recuerda por dónde ibas.
+- **Inicio sin «Para ti»**: *Seguir viendo*, *Tus canales* y *Novedades* (lo último de los canales que sigues). Con la cuenta de Google conectada, también *Vídeos que te gustan*.
+- **Seguir canales** sin cuenta (botón «Seguir»), o **traer tus suscripciones** de Google. Menú → Exportar/Importar canales para pasarlos entre dispositivos.
+- Tema claro/oscuro, instalable en iPad, iPhone, Android y PC.
+
+**Importante:** los vídeos se reproducen con el **reproductor oficial de YouTube incrustado** (la única forma permitida en una app web). Ese reproductor puede poner anuncios en algunos vídeos y ninguna web puede quitarlos. Para cero anuncios, usa YouTube en Safari/Chrome con la extensión ByAdBlock.
+
+**Cuota**: la clave gratis da 10.000 unidades al día. Una búsqueda gasta 100 (≈ 95 búsquedas al día); abrir canales, vídeos y novedades gasta 1 por petición. Las búsquedas se guardan 12 h para no repetir gasto. Si se acaba, se renueva a las 9:00 (hora de España); en Menú → «Clave de YouTube propia» puedes poner otra.
+
+### Cuenta de Google (opcional)
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → el mismo proyecto de tu clave → **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo *Externo*, déjala en modo *Prueba* y añade tu Gmail en *Usuarios de prueba*.
+2. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**.
+3. En **URI de redirección autorizados** añade exactamente `https://byalvaroo.github.io/ByAdBlock/app/` (y `http://localhost:47821/app/` si quieres probar en local).
+4. Copia el **ID de cliente** en `app/config.js` → `oauthClientId: '…apps.googleusercontent.com'` y haz push.
+
+El inicio de sesión es por redirección (no ventana emergente), así que funciona también en la app añadida a la pantalla de inicio. Es de solo lectura. El permiso dura 1 hora: las suscripciones se quedan guardadas, y para refrescarlas o ver tus «me gusta» se vuelve a pulsar en tu cuenta.
+
+### Probar la app sin gastar cuota
+
+```bash
+python -m http.server 47821      # en la carpeta ByAdBlock
+# abre http://localhost:47821/app/?mock
+```
+
 ## Qué hay en esta carpeta
 
 | Archivo | Para qué sirve |
 | --- | --- |
 | `index.html` | Página de instalación (GitHub Pages) |
+| `app/` | La app ByAdBlock (interfaz tipo YTVOD, todo YouTube) |
 | `byadblock.user.js` | ByAdBlock como userscript: iPad (app Userscripts), Tampermonkey, Violentmonkey |
 | `extension/` | ByAdBlock como extensión MV3 para Chrome, Edge, Brave y Firefox |
 | `ByAdBlock-extension.zip` | La carpeta `extension/` comprimida, para descargar desde la página |
