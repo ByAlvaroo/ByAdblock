@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "updated": "2026-11-21",
+  "comment": "Reglas remotas de ByAdBlock. Se suman a las de serie. Edita, sube a GitHub y en menos de 3 horas le llegan a todos sin reinstalar. 'disable' quita reglas de serie; 'replace': true sustituye listas en vez de sumarlas.",
+  "pruneKeys": [],
+  "adRenderers": [],
+  "cosmetic": [],
+  "skipSelectors": [],
+  "disable": []
+}

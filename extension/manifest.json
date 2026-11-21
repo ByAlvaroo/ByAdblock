@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "ByAdBlock",
+  "version": "1.0.0",
+  "description": "YouTube limpio, sin anuncios y sin esperas. HECHO POR @BYALVARO__",
+  "author": "@byalvaro__",
+  "homepage_url": "https://byalvaroo.github.io/ByAdBlock/",
+  "icons": {
+    "128": "icon128.png"
+  },
+  "host_permissions": [
+    "*://*.youtube.com/*",
+    "*://www.youtube-nocookie.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*",
+        "*://music.youtube.com/*",
+        "*://www.youtube-nocookie.com/*"
+      ],
+      "js": [
+        "core.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*",
+        "*://music.youtube.com/*"
+      ],
+      "js": [
+        "rules-loader.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "byadblock@byalvaroo.github.io",
+      "strict_min_version": "128.0"
+    }
+  }
+}
