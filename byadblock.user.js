@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ByAdBlock
-// @namespace    https://github.com/ByAlvaroo/ByAdBlock
-// @version      1.0.0
+// @namespace    https://github.com/ByAlvaroo/ByAdblock
+// @version      1.0.1
 // @description  YouTube limpio, sin anuncios y sin esperas. HECHO POR @BYALVARO__
 // @author       @byalvaro__
 // @match        *://www.youtube.com/*
@@ -12,9 +12,9 @@
 // @inject-into  page
 // @grant        none
 // @noframes
-// @updateURL    https://raw.githubusercontent.com/ByAlvaroo/ByAdBlock/main/byadblock.user.js
-// @downloadURL  https://raw.githubusercontent.com/ByAlvaroo/ByAdBlock/main/byadblock.user.js
-// @homepageURL  https://byalvaroo.github.io/ByAdBlock/
+// @updateURL    https://raw.githubusercontent.com/ByAlvaroo/ByAdblock/main/byadblock.user.js
+// @downloadURL  https://raw.githubusercontent.com/ByAlvaroo/ByAdblock/main/byadblock.user.js
+// @homepageURL  https://byalvaroo.github.io/ByAdblock/
 // ==/UserScript==
 
 /*!
@@ -38,8 +38,8 @@
   if (window[FLAG]) return;
   try { Object.defineProperty(window, FLAG, { value: true }); } catch (e) { /* nada */ }
 
-  var VERSION = '1.0.0';
-  var RULES_URL = 'https://raw.githubusercontent.com/ByAlvaroo/ByAdBlock/main/rules.json';
+  var VERSION = '1.0.1';
+  var RULES_URL = 'https://raw.githubusercontent.com/ByAlvaroo/ByAdblock/main/rules.json';
   var RULES_KEY = '__bab_r';
   var RULES_TS_KEY = '__bab_t';
   var REFRESH_MS = 3 * 60 * 60 * 1000; // cada 3 horas como mucho

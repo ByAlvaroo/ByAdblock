@@ -24,7 +24,7 @@ const manifest = {
   version,
   description: 'YouTube limpio, sin anuncios y sin esperas. HECHO POR @BYALVARO__',
   author: '@byalvaro__',
-  homepage_url: 'https://byalvaroo.github.io/ByAdBlock/',
+  homepage_url: 'https://byalvaroo.github.io/ByAdblock/',
   icons: { '128': 'icon128.png' },
   host_permissions: ['*://*.youtube.com/*', '*://www.youtube-nocookie.com/*'],
   content_scripts: [

@@ -19,8 +19,8 @@
   if (window[FLAG]) return;
   try { Object.defineProperty(window, FLAG, { value: true }); } catch (e) { /* nada */ }
 
-  var VERSION = '1.0.0';
-  var RULES_URL = 'https://raw.githubusercontent.com/ByAlvaroo/ByAdBlock/main/rules.json';
+  var VERSION = '1.0.1';
+  var RULES_URL = 'https://raw.githubusercontent.com/ByAlvaroo/ByAdblock/main/rules.json';
   var RULES_KEY = '__bab_r';
   var RULES_TS_KEY = '__bab_t';
   var REFRESH_MS = 3 * 60 * 60 * 1000; // cada 3 horas como mucho

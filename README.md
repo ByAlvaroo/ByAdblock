@@ -9,7 +9,7 @@ Funciona sobre el YouTube de verdad: tu cuenta, tus suscripciones y la interfaz 
 
 ## La app (app/)
 
-**https://byalvaroo.github.io/ByAdBlock/app/** — misma interfaz que YTVOD, con todo YouTube:
+**https://byalvaroo.github.io/ByAdblock/app/** — misma interfaz que YTVOD, con todo YouTube:
 
 - **Buscar** vídeos y canales (pestañas Todo / Vídeos / Canales). También puedes pegar un enlace de YouTube.
 - **Canales**: cabecera, todos sus vídeos (con «Cargar más») y buscador dentro del canal.
@@ -26,7 +26,7 @@ Funciona sobre el YouTube de verdad: tu cuenta, tus suscripciones y la interfaz 
 
 1. [console.cloud.google.com](https://console.cloud.google.com) → el mismo proyecto de tu clave → **APIs y servicios → Pantalla de consentimiento de OAuth**: tipo *Externo*, déjala en modo *Prueba* y añade tu Gmail en *Usuarios de prueba*.
 2. **Credenciales → Crear credenciales → ID de cliente de OAuth → Aplicación web**.
-3. En **URI de redirección autorizados** añade exactamente `https://byalvaroo.github.io/ByAdBlock/app/` (y `http://localhost:47821/app/` si quieres probar en local).
+3. En **URI de redirección autorizados** añade exactamente `https://byalvaroo.github.io/ByAdblock/app/` (y `http://localhost:47821/app/` si quieres probar en local).
 4. Copia el **ID de cliente** en `app/config.js` → `oauthClientId: '…apps.googleusercontent.com'` y haz push.
 
 El inicio de sesión es por redirección (no ventana emergente), así que funciona también en la app añadida a la pantalla de inicio. Es de solo lectura. El permiso dura 1 hora: las suscripciones se quedan guardadas, y para refrescarlas o ver tus «me gusta» se vuelve a pulsar en tu cuenta.
@@ -54,13 +54,13 @@ python -m http.server 47821      # en la carpeta ByAdBlock
 
 ## Subirlo a GitHub y abrirlo en el iPad
 
-1. Crea en GitHub un repositorio público llamado **`ByAdBlock`** en tu cuenta **ByAlvaroo** (el nombre importa: las URLs de actualización apuntan a `ByAlvaroo/ByAdBlock`).
+1. Crea en GitHub un repositorio público llamado **`ByAdblock`** en tu cuenta **ByAlvaroo** (el nombre importa: las URLs de actualización apuntan a `ByAlvaroo/ByAdblock`).
 2. Sube todo el contenido de esta carpeta a la rama `main`.
 3. En el repositorio: **Settings → Pages → Source: Deploy from a branch → Branch: `main` / `(root)` → Save**.
-4. En un par de minutos la página estará en **https://byalvaroo.github.io/ByAdBlock/**.
+4. En un par de minutos la página estará en **https://byalvaroo.github.io/ByAdblock/**.
 5. Ábrela en el Safari del iPad y sigue los pasos de la pestaña «iPad / iPhone».
 
-> Si usas otro nombre de usuario o de repositorio, cambia `ByAlvaroo/ByAdBlock` en `src/core.js`, `src/rules-loader.js`, `src/userscript-header.txt` y `build.js`, y ejecuta `node build.js`.
+> Si usas otro nombre de usuario o de repositorio, cambia `ByAlvaroo/ByAdblock` en `src/core.js`, `src/rules-loader.js`, `src/userscript-header.txt` y `build.js`, y ejecuta `node build.js`.
 
 ## Por qué así y no como «app» de la pantalla de inicio
 

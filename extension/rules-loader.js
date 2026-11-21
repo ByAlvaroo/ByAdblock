@@ -5,7 +5,7 @@
  */
 (function () {
   'use strict';
-  var URL_RULES = 'https://raw.githubusercontent.com/ByAlvaroo/ByAdBlock/main/rules.json';
+  var URL_RULES = 'https://raw.githubusercontent.com/ByAlvaroo/ByAdblock/main/rules.json';
   var KEY = '__bab_r', TS = '__bab_t', EVERY = 3 * 60 * 60 * 1000;
   try {
     var last = +localStorage.getItem(TS) || 0;

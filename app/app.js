@@ -1,10 +1,14 @@
 // ===== ByAdBlock · app =====
-// Todo YouTube (vídeos y canales) con la interfaz de YTVOD, sin «Para ti».
-// En el inicio: novedades de los canales que sigues (desde la app o tus suscripciones de Google),
-// seguir viendo y tus «me gusta». HECHO POR @BYALVARO__
-const CFG = window.BYAB || {};
+// Todo YouTube (vídeos y canales) con la interfaz de YTVOD.
+// Inicio: «Para ti» propio (hecho con tus suscripciones, tus «me gusta», lo que ves y lo más visto en España)
+// y «Suscripciones». HECHO POR @BYALVARO__
+// Acepta config.js de ByAdBlock (window.BYAB) y, por si acaso, el de YTVOD (window.CHAT_REPLAY).
+const CFG = (() => {
+  const a = window.BYAB || {}, b = window.CHAT_REPLAY || {};
+  return { maxFeedChannels: 150, ...a, apiKey: a.apiKey || b.apiKey || '', oauthClientId: a.oauthClientId || b.oauthClientId || '' };
+})();
 const $ = id => document.getElementById(id);
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
@@ -81,7 +85,9 @@ async function yt(path, params, { auth = false, ttl = 0, persist = false } = {})
   try { r = await fetch(API + path + '?' + new URLSearchParams(qp), { credentials: 'omit', headers }); j = await r.json(); }
   catch (e) { throw new ApiError('offline', 'Sin conexión'); }
   if (!r.ok) {
-    const er = j && j.error, reason = (er && er.errors && er.errors[0] && er.errors[0].reason) || String(r.status);
+    const er = j && j.error;
+    const det = er && Array.isArray(er.details) && er.details.find(d => d && d.reason);
+    const reason = (det && det.reason) || (er && er.errors && er.errors[0] && er.errors[0].reason) || String(r.status);
     if (auth && r.status === 401) { gTok = null; }
     throw new ApiError(reason, er && er.message);
   }
@@ -92,7 +98,10 @@ function apiFail(e) {
   const r = e && e.reason;
   if (r === 'quotaExceeded' || r === 'dailyLimitExceeded') return 'Se ha gastado la cuota diaria de YouTube. Se renueva a las 9:00 (hora de España).';
   if (r === 'nokey') return 'Falta la clave de YouTube en app/config.js.';
-  if (r === 'keyInvalid' || r === 'API_KEY_INVALID' || r === 'forbidden' || r === '403') return 'YouTube ha rechazado la clave. Revisa que esté activada «YouTube Data API v3» y que permita esta web.';
+  if (r === 'API_KEY_HTTP_REFERRER_BLOCKED') return `La clave no permite esta web. En Google Cloud → Credenciales → tu clave, añade ${location.origin}/* en «Restricciones de sitios web».`;
+  if (r === 'API_KEY_SERVICE_BLOCKED' || r === 'accessNotConfigured' || r === 'SERVICE_DISABLED') return 'La clave no tiene activada «YouTube Data API v3». Actívala en Google Cloud (APIs y servicios → Biblioteca).';
+  if (r === 'keyInvalid' || r === 'API_KEY_INVALID' || r === 'badRequest') return 'La clave de YouTube no es válida. Revisa app/config.js.';
+  if (r === 'forbidden' || r === '403') return 'YouTube ha rechazado la clave: ' + ((e && e.message) || 'sin detalle');
   if (r === 'offline') return 'Sin conexión a internet.';
   if (r === 'noauth') return 'Tienes que conectar tu cuenta de Google.';
   return 'YouTube ha dado un error: ' + ((e && e.message) || r || 'desconocido');
@@ -106,7 +115,7 @@ function normVideo(it) {
     id: it.id, title: decode(sn.title), channel: decode(sn.channelTitle), channelId: sn.channelId,
     thumb: bestThumb(sn.thumbnails) || thumbOf(it.id), published: Date.parse(sn.publishedAt) || 0,
     dur: isoDur(cd.duration), views: st.viewCount, likes: st.likeCount, desc: sn.description || '',
-    live: sn.liveBroadcastContent === 'live', upcoming: sn.liveBroadcastContent === 'upcoming', tags: sn.tags || []
+    live: sn.liveBroadcastContent === 'live', upcoming: sn.liveBroadcastContent === 'upcoming', tags: sn.tags || [], cat: sn.categoryId || ''
   };
 }
 async function videosInfo(ids) {
@@ -176,7 +185,7 @@ const hist = () => LS.get(HIST_KEY, {});
 function saveHist(v, t, d) {
   if (!v || !d) return;
   const all = hist();
-  all[v.id] = { t: Math.floor(t), d: Math.floor(d), at: Date.now(), title: v.title, channel: v.channel, channelId: v.channelId };
+  all[v.id] = { t: Math.floor(t), d: Math.floor(d), at: Date.now(), title: v.title, channel: v.channel, channelId: v.channelId, tags: (v.tags || []).slice(0, 8), cat: v.cat || '' };
   const keys = Object.keys(all);
   if (keys.length > 300) keys.sort((a, b) => all[a].at - all[b].at).slice(0, keys.length - 300).forEach(k => delete all[k]);
   LS.set(HIST_KEY, all);
@@ -227,15 +236,24 @@ async function syncGoogleSubs() {
   } while (pageToken && list.length < 2000);
   let me = null;
   try { const j = await yt('channels', { part: 'snippet', mine: 'true' }, { auth: true }); const c = j.items && j.items[0]; if (c) me = { title: decode(c.snippet.title), thumb: bestThumb(c.snippet.thumbnails) }; } catch {}
+  const likes = []; let lt = '';
+  try {
+    do {
+      const j = await yt('videos', { part: 'snippet,contentDetails,statistics', myRating: 'like', maxResults: 50, ...(lt ? { pageToken: lt } : {}) }, { auth: true });
+      (j.items || []).forEach(it => { const v = normVideo(it); VMETA.set(v.id, v); likes.push(slimV(v, 10)); });
+      lt = j.nextPageToken || '';
+    } while (lt && likes.length < 200);
+  } catch {}
   LS.set('byab_gacct', { at: Date.now(), me });
   LS.set('byab_gsubs', { list, at: Date.now() });
-  LS.del('byab_feed');
+  LS.set('byab_glikes', { list: likes, at: Date.now() });
+  LS.del('byab_feed'); LS.del('byab_fy');
   paintAccount();
   return list.length;
 }
 function gDisconnect() {
   if (gTok) fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(gTok), { method: 'POST', mode: 'no-cors' }).catch(() => {});
-  gTok = null; try { sessionStorage.removeItem('byab_gtok'); } catch {} LS.del('byab_gacct'); LS.del('byab_gsubs'); LS.del('byab_feed'); paintAccount();
+  gTok = null; try { sessionStorage.removeItem('byab_gtok'); } catch {} LS.del('byab_gacct'); LS.del('byab_gsubs'); LS.del('byab_glikes'); LS.del('byab_feed'); LS.del('byab_fy'); paintAccount();
 }
 function paintAccount() {
   const b = $('bAccount'), a = LS.get('byab_gacct', null);
@@ -268,6 +286,101 @@ async function buildFeed(force) {
   const slim = vids.map(v => ({ ...v, desc: '', tags: [] }));
   LS.set('byab_feed', { at: Date.now(), sig, items: slim });
   return slim;
+}
+
+/* ---------- «Para ti» propio ----------
+   Mezcla, sin el algoritmo de YouTube:
+   · Suscripciones: lo último de los canales que sigues.
+   · Canales afines: los que más ves o te gustan y aún no sigues.
+   · Temas: 1-2 búsquedas al día con las palabras que más se repiten en lo que te gusta y ves.
+   · Tendencias: lo más visto en España, y en las categorías que más te gustan.
+   Se guarda 1 hora; las búsquedas de temas, 24 h (cada una gasta 100 de cuota). */
+const slimV = (v, tags = 0) => ({ id: v.id, title: v.title, channel: v.channel, channelId: v.channelId, thumb: v.thumb, published: v.published, dur: v.dur, views: v.views, live: v.live, upcoming: v.upcoming, cat: v.cat, tags: tags ? (v.tags || []).slice(0, tags) : [] });
+const likesList = () => (LS.get('byab_glikes', { list: [] }).list) || [];
+const STOP = new Set(('para como este esta estos estas pero porque cuando donde desde hasta sobre entre tiene tienen todo todos toda todas nada algo cosas cosa video vídeo videos vídeos nuevo nueva mejor mejores parte capitulo capítulo episodio official oficial with from that this your what when have will about short shorts live directo stream hace hacer hago aqui aquí ahora solo sólo muy mucho mucha porque mientras sin con los las del una unos unas the and for you are not but can how why who all out new vs ft feat parte final completo completa').split(' '));
+function interestQueries(items) {
+  const tagCount = new Map(), wordCount = new Map();
+  items.forEach((v, i) => {
+    const w = i < 30 ? 2 : 1; // lo más reciente pesa más
+    (v.tags || []).forEach(t => { t = String(t).toLowerCase().trim(); if (t.length > 3 && t.length < 40) tagCount.set(t, (tagCount.get(t) || 0) + w); });
+    String(v.title || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/).forEach(x => { if (x.length > 3 && !STOP.has(x) && !/^\d+$/.test(x)) wordCount.set(x, (wordCount.get(x) || 0) + w); });
+  });
+  const tags = [...tagCount.entries()].filter(e => e[1] >= 3).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  const words = [...wordCount.entries()].filter(e => e[1] >= 2).sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  const qs = [];
+  if (tags[0]) qs.push(tags[0]);
+  if (tags[1]) qs.push(tags[1]);
+  for (let i = 0; qs.length < 2 && i + 1 < words.length; i += 2) qs.push(words[i] + ' ' + words[i + 1]);
+  return qs.slice(0, 2);
+}
+function dailyShuffle(arr, salt) {
+  let seed = 0; const k = new Date().toISOString().slice(0, 10) + salt;
+  for (let i = 0; i < k.length; i++) seed = (seed * 31 + k.charCodeAt(i)) >>> 0;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+async function buildForYou(force) {
+  const cached = LS.get('byab_fy', null);
+  if (!force && cached && Date.now() - cached.at < 60 * 60e3) return cached.items;
+  const H = hist(), likes = likesList();
+  const watched = Object.entries(H).sort((a, b) => b[1].at - a[1].at).map(([id, x]) => ({ id, ...x }));
+  const done = new Set(watched.filter(x => x.t > 15).map(x => x.id)); // lo ya empezado sale en «Seguir viendo»
+  const followed = new Set(followedChannels().map(c => c.id));
+  const pools = { subs: [], afines: [], temas: [], tend: [] };
+  let firstErr = null;
+  const safe = async fn => { try { await fn(); } catch (e) { firstErr = firstErr || e; } };
+
+  await Promise.all([
+    // Suscripciones
+    safe(async () => { if (followed.size) pools.subs = (await buildFeed(false)).slice(0, 48).map(v => v.id); }),
+    // Canales afines (más vistos / más «me gusta» que no sigues)
+    safe(async () => {
+      const cnt = new Map();
+      [...likes, ...watched].forEach((v, i) => { if (v.channelId && !followed.has(v.channelId)) cnt.set(v.channelId, (cnt.get(v.channelId) || 0) + (i < 40 ? 2 : 1)); });
+      const top = [...cnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+      const res = await Promise.all(top.map(cid => yt('playlistItems', { part: 'contentDetails', playlistId: 'UU' + cid.slice(2), maxResults: 6 }, { ttl: 6 * 3600e3, persist: true }).catch(() => null)));
+      res.forEach(j => (j && j.items || []).forEach(it => it.contentDetails && pools.afines.push(it.contentDetails.videoId)));
+    }),
+    // Temas
+    safe(async () => {
+      const qs = interestQueries([...likes, ...watched.slice(0, 60)]);
+      const res = await Promise.all(qs.map(q => yt('search', { part: 'snippet', q, type: 'video', maxResults: 20, relevanceLanguage: 'es', regionCode: 'ES', safeSearch: 'none' }, { ttl: 24 * 3600e3, persist: true })));
+      res.forEach(j => (j.items || []).forEach(it => it.id && it.id.videoId && pools.temas.push(it.id.videoId)));
+    }),
+    // Tendencias (general + tus categorías favoritas)
+    safe(async () => {
+      const cats = new Map(); likes.forEach(v => v.cat && cats.set(v.cat, (cats.get(v.cat) || 0) + 1));
+      const topCats = [...cats.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0]);
+      const reqs = [yt('videos', { part: 'snippet,contentDetails,statistics', chart: 'mostPopular', regionCode: 'ES', maxResults: 30 }, { ttl: 3 * 3600e3, persist: true })]
+        .concat(topCats.map(c => yt('videos', { part: 'snippet,contentDetails,statistics', chart: 'mostPopular', regionCode: 'ES', videoCategoryId: c, maxResults: 20 }, { ttl: 3 * 3600e3, persist: true }).catch(() => null)));
+      const res = await Promise.all(reqs);
+      const catIds = [], gen = [];
+      res.forEach((j, i) => (j && j.items || []).forEach(it => { const v = normVideo(it); VMETA.set(v.id, v); (i ? catIds : gen).push(v.id); }));
+      pools.tend = [...catIds, ...gen];
+    })
+  ]);
+
+  // Datos de todos los vídeos y mezcla
+  const all = [...new Set([...pools.subs, ...pools.afines, ...pools.temas, ...pools.tend])].filter(id => id && !done.has(id));
+  const info = new Map((await videosInfo(all).catch(e => { firstErr = firstErr || e; return []; })).map(v => [v.id, v]));
+  const ok = id => { const v = info.get(id); return v && !(v.dur > 0 && v.dur <= 60) && !v.upcoming; }; // sin Shorts ni estrenos
+  const q = {
+    subs: pools.subs.filter(ok),
+    afines: dailyShuffle(pools.afines.filter(ok), 'a'),
+    temas: dailyShuffle(pools.temas.filter(ok), 't'),
+    tend: dailyShuffle(pools.tend.filter(ok), 'r')
+  };
+  const pattern = ['subs', 'afines', 'temas', 'subs', 'tend', 'afines', 'subs', 'temas', 'tend'];
+  const out = [], seen = new Set();
+  for (let i = 0; out.length < 96 && Object.values(q).some(a => a.length); i++) {
+    const src = q[pattern[i % pattern.length]];
+    while (src.length) { const id = src.shift(); if (!seen.has(id)) { seen.add(id); out.push(slimV(info.get(id))); break; } }
+  }
+  if (!out.length && firstErr) throw firstErr;
+  LS.set('byab_fy', { at: Date.now(), items: out });
+  return out;
 }
 
 /* ---------- Tarjetas ---------- */
@@ -340,55 +453,57 @@ async function showHome(id) {
   $('q').value = '';
   page.replaceChildren();
   if (!apiKey()) page.append(h('div', { class: 'notice' }, 'Falta la clave de YouTube en app/config.js.'));
+  const tab = LS.get('byab_hometab', 'parati');
   const chans = followedChannels();
   const H = hist();
   const cont = Object.entries(H).filter(([, x]) => x.d > 60 && x.t > 15 && x.t < x.d - 20).sort((a, b) => b[1].at - a[1].at).slice(0, 20);
 
-  if (!chans.length && !cont.length) {
-    page.append(h('div', { class: 'empty' },
-      h('img', { class: 'big', src: 'icons/icon-192.png', alt: '' }),
-      h('h2', { text: 'Busca lo que quieras ver' }),
-      h('p', { text: 'Aquí no hay «Para ti». Busca vídeos o canales y pulsa «Seguir»: sus vídeos nuevos aparecerán en el inicio.' }),
-      h('div', { class: 'acts' },
-        h('button', { class: 'btn p', type: 'button', onclick: () => $('q').focus(), text: 'Buscar' }),
-        h('button', { class: 'btn', type: 'button', onclick: openAccount, text: gConnected() ? 'Tu cuenta de Google' : 'Traer mis suscripciones de Google' }))));
-    return;
-  }
+  const chips = h('div', { class: 'chips' },
+    [['parati', 'Para ti'], ['subs', 'Suscripciones']].map(([k, t]) => h('button', { class: 'chip' + (tab === k ? ' on' : ''), type: 'button', text: t, onclick: () => { LS.set('byab_hometab', k); showHome(++navId); } })),
+    h('button', { class: 'chip', type: 'button', text: 'Actualizar', style: { marginLeft: 'auto' }, onclick: () => { LS.del(tab === 'parati' ? 'byab_fy' : 'byab_feed'); showHome(++navId); } }));
+  page.append(chips);
 
   if (cont.length) {
     const vids = cont.map(([vid, x]) => ({ id: vid, title: x.title, channel: x.channel, channelId: x.channelId, thumb: thumbOf(vid), dur: x.d }));
     page.append(section('Seguir viendo', null, h('div', { class: 'row' }, vids.map(v => videoCard(v, { noAvatar: true })))));
   }
 
-  if (chans.length) {
-    page.append(section('Tus canales', h('span', { class: 'n', text: chans.length }),
-      h('div', { class: 'chans' }, chans.map(c => h('a', { href: '#/canal/' + c.id }, avatarEl(c.thumb, c.title), h('span', { text: c.title }))))));
-    const feedSec = section('Novedades', h('button', { class: 'btn sm more', type: 'button', text: 'Actualizar', onclick: () => fillFeed(true) }));
-    const body = h('div'); feedSec.append(body); page.append(feedSec);
-    const fillFeed = async force => {
-      body.replaceChildren(skeletons(8));
-      try {
-        const vids = await buildFeed(force);
-        if (id !== navId) return;
-        channelsInfo([...new Set(vids.map(v => v.channelId))].slice(0, 100)).catch(() => {}).then(() => {
-          if (id !== navId) return;
-          body.replaceChildren(vids.length ? h('div', { class: 'grid' }, vids.map(v => videoCard(v))) : h('p', { class: 'cc', style: { padding: '0 28px' }, text: 'Tus canales no han subido vídeos últimamente.' }));
-        });
-      } catch (e) { if (id === navId) body.replaceChildren(errorBox(e)); }
-    };
-    fillFeed(false);
+  const fill = async (body, loader, empty) => {
+    body.replaceChildren(skeletons(8));
+    try {
+      const vids = await loader();
+      if (id !== navId) return;
+      await channelsInfo([...new Set(vids.map(v => v.channelId))].slice(0, 100)).catch(() => {});
+      if (id !== navId) return;
+      body.replaceChildren(vids.length ? h('div', { class: 'grid' }, vids.map(v => videoCard(v))) : empty);
+    } catch (e) { if (id === navId) body.replaceChildren(errorBox(e)); }
+  };
+
+  if (tab === 'parati') {
+    const thin = !chans.length && !likesList().length && Object.keys(H).length < 3;
+    if (thin) page.append(h('div', { class: 'notice' }, 'Tu «Para ti» mejora cuanto más uses la app: sigue canales, mira vídeos o conecta tu cuenta de Google. ', h('button', { class: 'btn sm', type: 'button', text: gConnected() ? 'Tu cuenta' : 'Conectar Google', onclick: openAccount })));
+    const body = h('div'); page.append(section('Para ti', null, body));
+    fill(body, () => buildForYou(false), h('p', { class: 'cc', style: { padding: '0 28px' }, text: 'Aún no hay recomendaciones. Busca y mira algunos vídeos.' }));
+    return;
   }
 
-  if (gConnected() && CFG.oauthClientId && gTok && Date.now() < gTokExp) {
-    const likeSec = section('Vídeos que te gustan', null); const body = h('div'); likeSec.append(body);
-    page.append(likeSec);
-    try {
-      const j = await yt('videos', { part: 'snippet,contentDetails,statistics', myRating: 'like', maxResults: 24 }, { auth: true, ttl: 15 * 60e3 });
-      if (id !== navId) return;
-      const vids = (j.items || []).map(normVideo); vids.forEach(v => VMETA.set(v.id, v));
-      if (vids.length) body.append(h('div', { class: 'row' }, vids.map(v => videoCard(v, { noAvatar: true })))); else likeSec.remove();
-    } catch { likeSec.remove(); }
+  // Suscripciones
+  if (!chans.length) {
+    page.append(h('div', { class: 'empty' },
+      h('img', { class: 'big', src: 'icons/icon-192.png', alt: '' }),
+      h('h2', { text: 'Aún no sigues ningún canal' }),
+      h('p', { text: 'Busca un canal y pulsa «Seguir», o trae tus suscripciones de YouTube.' }),
+      h('div', { class: 'acts' },
+        h('button', { class: 'btn p', type: 'button', onclick: () => $('q').focus(), text: 'Buscar' }),
+        h('button', { class: 'btn', type: 'button', onclick: openAccount, text: gConnected() ? 'Tu cuenta de Google' : 'Conectar Google' }))));
+  } else {
+    page.append(section('Tus canales', h('span', { class: 'n', text: chans.length }),
+      h('div', { class: 'chans' }, chans.map(c => h('a', { href: '#/canal/' + c.id }, avatarEl(c.thumb, c.title), h('span', { text: c.title }))))));
+    const body = h('div'); page.append(section('Novedades', null, body));
+    fill(body, () => buildFeed(false), h('p', { class: 'cc', style: { padding: '0 28px' }, text: 'Tus canales no han subido vídeos últimamente.' }));
   }
+  const likes = likesList();
+  if (likes.length) page.append(section('Vídeos que te gustan', h('span', { class: 'n', text: likes.length }), h('div', { class: 'row' }, likes.slice(0, 30).map(v => videoCard(v, { noAvatar: true })))));
 }
 
 /* ---------- Búsqueda ---------- */
@@ -626,7 +741,7 @@ function openAccount() {
   const run = async (fn, okMsg) => { err.textContent = ''; try { const r = await fn(); closeSheet(); toast(okMsg(r)); route(); } catch (e) { err.textContent = e.reason === 'noauth' ? 'No se ha completado el inicio de sesión.' : apiFail(e); } };
   if (!a) {
     sheet(h('h3', { text: 'Conectar tu cuenta de Google' }),
-      h('p', { text: 'Se traen tus suscripciones y tus «me gusta» para el inicio. Solo lectura: la app no puede cambiar nada de tu cuenta y no hay «Para ti».' }),
+      h('p', { text: 'Se traen tus suscripciones y tus «me gusta» para el inicio y el «Para ti». Solo lectura: la app no puede cambiar nada de tu cuenta.' }),
       err, h('div', { class: 'acts' }, h('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: closeSheet }), h('button', { class: 'btn p', type: 'button', text: 'Conectar', onclick: () => run(() => syncGoogleSubs(), n => `Listo: ${n} suscripciones`) })));
   } else {
     sheet(h('div', { class: 'brand' }, a.me && a.me.thumb ? h('img', { src: a.me.thumb, alt: '', referrerpolicy: 'no-referrer', style: { borderRadius: '50%' } }) : null, h('div', null, h('h3', { text: a.me ? a.me.title : 'Cuenta conectada' }), h('div', { class: 'cc', text: n + ' suscripciones · actualizado ' + fmtAgo(gsubs().at) }))),
@@ -659,7 +774,7 @@ $('bMenu').addEventListener('click', () => {
       sheet(h('h3', { text: 'Clave de YouTube' }), h('p', { text: 'Déjala vacía para usar la de la app. Cada búsqueda gasta 100 de las 10.000 unidades diarias gratuitas.' }), inp,
         h('div', { class: 'acts' }, h('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: closeSheet }), h('button', { class: 'btn p', type: 'button', text: 'Guardar', onclick: () => { LS.set('byab_key_user', inp.value.trim()); closeSheet(); toast('Guardada'); route(); } })));
     }),
-    h('p', { class: 'cc', style: { marginTop: '14px' }, text: 'Versión ' + VERSION + ' · Los vídeos se reproducen con el reproductor oficial de YouTube.' }));
+    h('p', { class: 'cc', style: { marginTop: '14px' }, text: 'Versión ' + VERSION + ' · Los vídeos se reproducen con el reproductor oficial de YouTube. El «Para ti» lo crea la app con tus canales, tus «me gusta» y lo que ves.' }));
 });
 
 /* ---------- Arranque ---------- */

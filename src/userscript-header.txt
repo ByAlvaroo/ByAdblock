@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         ByAdBlock
-// @namespace    https://github.com/ByAlvaroo/ByAdBlock
+// @namespace    https://github.com/ByAlvaroo/ByAdblock
 // @version      {{VERSION}}
 // @description  YouTube limpio, sin anuncios y sin esperas. HECHO POR @BYALVARO__
 // @author       @byalvaro__
@@ -12,7 +12,7 @@
 // @inject-into  page
 // @grant        none
 // @noframes
-// @updateURL    https://raw.githubusercontent.com/ByAlvaroo/ByAdBlock/main/byadblock.user.js
-// @downloadURL  https://raw.githubusercontent.com/ByAlvaroo/ByAdBlock/main/byadblock.user.js
-// @homepageURL  https://byalvaroo.github.io/ByAdBlock/
+// @updateURL    https://raw.githubusercontent.com/ByAlvaroo/ByAdblock/main/byadblock.user.js
+// @downloadURL  https://raw.githubusercontent.com/ByAlvaroo/ByAdblock/main/byadblock.user.js
+// @homepageURL  https://byalvaroo.github.io/ByAdblock/
 // ==/UserScript==

@@ -35,6 +35,9 @@
           if (String(p.type).indexOf('channel') > -1) items.push({ id: { kind: 'youtube#channel', channelId: chId(1) } }, { id: { kind: 'youtube#channel', channelId: chId(4) } });
           if (String(p.type).indexOf('video') > -1) for (var i = 0; i < 12; i++) items.push({ id: { kind: 'youtube#video', videoId: vId(i) } });
           res({ items: items, nextPageToken: 'n2' });
+        } else if (path === 'videos' && (p.chart || p.myRating)) {
+          var arr = []; for (var t = 0; t < 20; t++) arr.push(video(40 + t + (p.videoCategoryId ? 30 : 0)));
+          res({ items: arr });
         } else if (path === 'videos') {
           res({ items: String(p.id || '').split(',').map(function (id) { var n = parseInt(id.replace(/\D/g, ''), 10) || 0; return video(n); }) });
         } else if (path === 'channels') {
